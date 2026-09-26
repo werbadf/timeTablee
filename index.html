@@ -2,8 +2,8 @@
 <html lang="ru" class="dark">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>TimeTable - Расписание занятий</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>TimeTable Pro - Умное рабочее пространство</title>
 
   <!-- Tailwind CSS via CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -50,6 +50,21 @@
     }
     ::-webkit-scrollbar-thumb:hover {
       background: rgba(150, 150, 150, 0.5);
+    }
+
+    /* Mobile UX optimizations */
+    * {
+      -webkit-tap-highlight-color: transparent;
+    }
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+    .touch-pan {
+      -webkit-overflow-scrolling: touch;
     }
   </style>
 </head>
@@ -229,6 +244,7 @@
       const [taskViewMode, setTaskViewMode] = useState('kanban');
       const [taskFilterPriority, setTaskFilterPriority] = useState('all');
       const [taskSearch, setTaskSearch] = useState('');
+      const [mobileKanbanTab, setMobileKanbanTab] = useState('todo');
       
       // Modals
       const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
@@ -236,6 +252,10 @@
       const [isClassModalOpen, setIsClassModalOpen] = useState(false);
       const [isSubjectModalOpen, setIsSubjectModalOpen] = useState(false);
       const [selectedTextbookDuty, setSelectedTextbookDuty] = useState('Оба');
+      
+      // Sub-tab for Schedule: 'daily' (По дням) | 'textbooks' (Полное расписание учебников)
+      const [scheduleSubTab, setScheduleSubTab] = useState('daily');
+      const [textbookFilter, setTextbookFilter] = useState('all'); // 'all', 'Рома', 'Ермолай', 'Оба', 'Без учебника'
       
       // Activity Day Details Modal
       const [selectedDateForDetails, setSelectedDateForDetails] = useState(null);
@@ -254,6 +274,21 @@
 
       const audioCtxRef = useRef(null);
       const noiseSourceRef = useRef(null);
+      const heatmapScrollRef = useRef(null);
+
+      // Auto-scroll heatmap to today on mobile when analytics tab opens
+      useEffect(() => {
+        if (activeTab === 'analytics' && heatmapScrollRef.current) {
+          setTimeout(() => {
+            if (heatmapScrollRef.current) {
+              heatmapScrollRef.current.scrollTo({
+                left: heatmapScrollRef.current.scrollWidth,
+                behavior: 'smooth'
+              });
+            }
+          }, 150);
+        }
+      }, [activeTab]);
 
       useEffect(() => {
         localStorage.setItem('studyflow_v3_theme', JSON.stringify(darkMode));
@@ -625,6 +660,27 @@
         { id: 'done', title: 'Сдано / Готово', badgeColor: 'bg-emerald-500/20 text-emerald-400' },
       ];
 
+      // Расчет суммарной статистики учебников на всю неделю
+      const textbookStats = useMemo(() => {
+        let roma = 0;
+        let ermolay = 0;
+        let both = 0;
+        let none = 0;
+        let total = 0;
+
+        Object.values(schedule).forEach(dayClasses => {
+          (dayClasses || []).forEach(c => {
+            total++;
+            if (c.textbookDuty === 'Рома') roma++;
+            else if (c.textbookDuty === 'Ермолай') ermolay++;
+            else if (c.textbookDuty === 'Оба') both++;
+            else none++;
+          });
+        });
+
+        return { roma, ermolay, both, none, total };
+      }, [schedule]);
+
       // Live Class Countdown
       const currentClassInfo = useMemo(() => {
         const dayNames = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
@@ -869,27 +925,27 @@
           )}
 
           {/* Navigation Header */}
-          <header className="sticky top-0 z-40 backdrop-blur-xl border-b border-zinc-200/80 dark:border-zinc-800/80 bg-white/80 dark:bg-[#0a0c10]/80 px-4 lg:px-8 py-3.5 transition-colors">
-            <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
+          <header className="sticky top-0 z-40 backdrop-blur-xl border-b border-zinc-200/80 dark:border-zinc-800/80 bg-white/80 dark:bg-[#0a0c10]/80 px-3 sm:px-4 lg:px-8 py-2.5 sm:py-3.5 transition-colors">
+            <div className="max-w-7xl mx-auto flex items-center justify-between gap-2 sm:gap-4">
               
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-violet-600 via-indigo-600 to-cyan-400 flex items-center justify-center text-white shadow-lg shadow-indigo-500/25">
-                  <Icon name="sparkles" className="w-5 h-5" />
+              <div className="flex items-center gap-2 sm:gap-3">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-violet-600 via-indigo-600 to-cyan-400 flex items-center justify-center text-white shadow-md shadow-indigo-500/25 shrink-0">
+                  <Icon name="sparkles" className="w-4 h-4 sm:w-5 sm:h-5" />
                 </div>
                 <div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xl font-black tracking-tight bg-gradient-to-r from-violet-400 via-indigo-400 to-cyan-400 bg-clip-text text-transparent">
-                      StudyFlow
+                  <div className="flex items-center gap-1.5 sm:gap-2">
+                    <span className="text-base sm:text-xl font-black tracking-tight bg-gradient-to-r from-violet-400 via-indigo-400 to-cyan-400 bg-clip-text text-transparent">
+                      TimeTable Pro
                     </span>
-                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                    <span className="text-[10px] sm:text-[11px] font-bold px-1.5 sm:px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
                       PRO
                     </span>
                   </div>
                 </div>
               </div>
 
-              {/* Navigation Tabs */}
-              <nav className="flex items-center gap-1 sm:gap-1.5 p-1 rounded-2xl bg-zinc-100 dark:bg-zinc-900/90 border border-zinc-200 dark:border-zinc-800 text-sm font-medium">
+              {/* Desktop Navigation Tabs (Hidden on mobile phones, replaced by Bottom Navigation) */}
+              <nav className="hidden sm:flex items-center gap-1 sm:gap-1.5 p-1 rounded-2xl bg-zinc-100 dark:bg-zinc-900/90 border border-zinc-200 dark:border-zinc-800 text-sm font-medium">
                 {/* 1. ДОМАШКА */}
                 <button
                   onClick={() => setActiveTab('tasks')}
@@ -900,7 +956,7 @@
                   }`}
                 >
                   <Icon name="checkCircle" className="w-4 h-4 text-indigo-500" />
-                  <span className="hidden sm:inline">Домашка</span>
+                  <span>Домашка</span>
                 </button>
 
                 {/* 2. РАСПИСАНИЕ */}
@@ -913,7 +969,7 @@
                   }`}
                 >
                   <Icon name="calendar" className="w-4 h-4 text-violet-500" />
-                  <span className="hidden sm:inline">Расписание</span>
+                  <span>Расписание</span>
                 </button>
 
                 {/* 3. УСПЕВАЕМОСТЬ */}
@@ -926,10 +982,10 @@
                   }`}
                 >
                   <Icon name="award" className="w-4 h-4 text-amber-500" />
-                  <span className="hidden sm:inline">Успеваемость</span>
+                  <span>Успеваемость</span>
                 </button>
 
-                {/* 4. АКТИВНОСТЬ (ТЕПЕРЬ ПОСЛЕДНЯЯ ВКЛАДКА) */}
+                {/* 4. АКТИВНОСТЬ */}
                 <button
                   onClick={() => setActiveTab('analytics')}
                   className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-xl transition-all ${
@@ -939,26 +995,26 @@
                   }`}
                 >
                   <Icon name="trending" className="w-4 h-4 text-emerald-500" />
-                  <span className="hidden sm:inline">Активность</span>
+                  <span>Активность</span>
                 </button>
               </nav>
 
               {/* Theme & Zen Action Buttons */}
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 sm:gap-2">
                 <button
                   onClick={() => {
                     setZenOpen(true);
                     if (!zenTask && tasks.length > 0) setZenTask(tasks[0]);
                   }}
-                  className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white text-xs sm:text-sm font-bold shadow-md shadow-indigo-600/30 transition-all active:scale-95"
+                  className="flex items-center gap-1.5 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white text-xs sm:text-sm font-bold shadow-md shadow-indigo-600/30 transition-all active:scale-95"
                 >
-                  <Icon name="headphones" className="w-4 h-4" />
-                  <span className="hidden md:inline">Дзен-режим</span>
+                  <Icon name="headphones" className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                  <span className="hidden md:inline">Фокусирование</span>
                 </button>
 
                 <button
                   onClick={() => setDarkMode(!darkMode)}
-                  className="p-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-600 dark:text-zinc-300 hover:scale-105 transition-all shadow-sm"
+                  className="p-2 sm:p-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-600 dark:text-zinc-300 hover:scale-105 transition-all shadow-sm"
                   title="Сменить тему оформления"
                 >
                   {darkMode ? <Icon name="sun" className="w-4 h-4 text-amber-400" /> : <Icon name="moon" className="w-4 h-4 text-indigo-600" />}
@@ -968,32 +1024,32 @@
           </header>
 
           {/* Current Class Live Bar */}
-          <div className="max-w-7xl mx-auto px-4 lg:px-8 mt-5">
-            <div className="relative overflow-hidden rounded-2xl border border-indigo-500/30 bg-gradient-to-r from-indigo-950/40 via-purple-950/20 to-zinc-900/50 dark:bg-zinc-900/60 backdrop-blur-md p-4 lg:p-4.5 shadow-md">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div className="flex items-center gap-3.5">
-                  <div className="w-9 h-9 rounded-xl bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400 shrink-0">
+          <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8 mt-3 sm:mt-5">
+            <div className="relative overflow-hidden rounded-2xl border border-indigo-500/30 bg-gradient-to-r from-indigo-950/40 via-purple-950/20 to-zinc-900/50 dark:bg-zinc-900/60 backdrop-blur-md p-3 sm:p-4.5 shadow-md">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3">
+                <div className="flex items-center gap-2.5 sm:gap-3.5">
+                  <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400 shrink-0">
                     <Icon name="clock" className="w-4 h-4 animate-spin-slow" />
                   </div>
                   <div>
-                    <div className="text-[11px] uppercase tracking-wider font-bold text-indigo-400">
+                    <div className="text-[10px] sm:text-[11px] uppercase tracking-wider font-bold text-indigo-400">
                       {currentClassInfo.status === 'active' ? 'Идет урок прямо сейчас' : 'Текущий статус уроков'}
                     </div>
                     {currentClassInfo.status === 'active' ? (
-                      <div className="text-sm sm:text-base font-bold text-zinc-900 dark:text-white flex items-center gap-2">
+                      <div className="text-xs sm:text-base font-bold text-zinc-900 dark:text-white flex flex-wrap items-center gap-1.5 sm:gap-2">
                         <span>{currentClassInfo.classItem.name}</span>
                         {currentClassInfo.classItem.textbookDuty && currentClassInfo.classItem.textbookDuty !== 'Без учебника' ? (
-                          <span className="text-xs font-semibold px-2 py-0.5 rounded-lg bg-indigo-500/20 text-indigo-300">
+                          <span className="text-[10px] sm:text-xs font-semibold px-2 py-0.5 rounded-lg bg-indigo-500/20 text-indigo-300">
                             Учебник: {currentClassInfo.classItem.textbookDuty}
                           </span>
                         ) : (
-                          <span className="text-xs font-medium px-2 py-0.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700/60">
+                          <span className="text-[10px] sm:text-xs font-medium px-2 py-0.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700/60">
                             Без учебника
                           </span>
                         )}
                       </div>
                     ) : (
-                      <div className="text-xs sm:text-sm font-medium text-zinc-600 dark:text-zinc-300">
+                      <div className="text-xs sm:text-sm font-medium text-zinc-600 dark:text-zinc-300 leading-snug">
                         {currentClassInfo.message}
                       </div>
                     )}
@@ -1001,8 +1057,8 @@
                 </div>
 
                 {currentClassInfo.status === 'active' && (
-                  <div className="flex items-center gap-3">
-                    <div className="px-3 py-1 rounded-xl bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 text-xs font-bold">
+                  <div className="flex items-center justify-between sm:justify-end gap-2.5 pt-1.5 sm:pt-0 border-t sm:border-t-0 border-indigo-500/20">
+                    <div className="px-2.5 py-1 rounded-xl bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 text-xs font-bold">
                       До звонка: <span className="text-white font-extrabold">{currentClassInfo.minutesLeft} мин</span>
                     </div>
                     <button
@@ -1017,15 +1073,15 @@
             </div>
           </div>
 
-          <main className="max-w-7xl mx-auto px-4 lg:px-8 py-6">
+          <main className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8 py-4 sm:py-6 pb-28 sm:pb-8">
             
             {/* TAB 1: TASKS & HOMEWORK */}
             {activeTab === 'tasks' && (
-              <div className="space-y-6">
+              <div className="space-y-4 sm:space-y-6">
                 
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4">
                   <div>
-                    <h1 className="text-2xl font-black tracking-tight text-zinc-900 dark:text-white">
+                    <h1 className="text-xl sm:text-2xl font-black tracking-tight text-zinc-900 dark:text-white">
                       Домашние задания и дедлайны
                     </h1>
                     <p className="text-xs sm:text-sm text-zinc-500 dark:text-zinc-400">
@@ -1033,27 +1089,27 @@
                     </p>
                   </div>
 
-                  <div className="flex flex-wrap items-center gap-2.5">
+                  <div className="flex flex-wrap items-center gap-2">
                     <input
                       type="text"
-                      placeholder="Поиск..."
+                      placeholder="Поиск задания..."
                       value={taskSearch}
                       onChange={(e) => setTaskSearch(e.target.value)}
-                      className="px-3 py-1.5 text-xs sm:text-sm rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      className="flex-1 sm:flex-none min-w-[130px] px-3 py-2 text-xs sm:text-sm rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     />
 
                     <select
                       value={taskFilterPriority}
                       onChange={(e) => setTaskFilterPriority(e.target.value)}
-                      className="px-3 py-1.5 text-xs sm:text-sm rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 focus:outline-none"
+                      className="px-2.5 py-2 text-xs sm:text-sm rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 focus:outline-none"
                     >
-                      <option value="all">Все приоритеты</option>
+                      <option value="all">Все</option>
                       <option value="high">🔥 Высокий</option>
                       <option value="medium">⚡ Средний</option>
                       <option value="low">☕ Низкий</option>
                     </select>
 
-                    <div className="flex items-center p-1 rounded-xl bg-zinc-200/70 dark:bg-zinc-800/80 border border-zinc-300 dark:border-zinc-700">
+                    <div className="flex items-center p-0.5 rounded-xl bg-zinc-200/70 dark:bg-zinc-800/80 border border-zinc-300 dark:border-zinc-700">
                       <button
                         onClick={() => setTaskViewMode('kanban')}
                         className={`p-1.5 rounded-lg transition-all ${
@@ -1061,7 +1117,7 @@
                         }`}
                         title="Канбан-доска"
                       >
-                        <Icon name="grid" className="w-4 h-4" />
+                        <Icon name="grid" className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                       </button>
                       <button
                         onClick={() => setTaskViewMode('list')}
@@ -1070,7 +1126,7 @@
                         }`}
                         title="Табличный вид"
                       >
-                        <Icon name="list" className="w-4 h-4" />
+                        <Icon name="list" className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                       </button>
                     </div>
 
@@ -1079,7 +1135,7 @@
                         setEditingTask(null);
                         setIsTaskModalOpen(true);
                       }}
-                      className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs sm:text-sm font-bold shadow-md shadow-indigo-600/30 transition-all active:scale-95"
+                      className="w-full sm:w-auto flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs sm:text-sm font-bold shadow-md shadow-indigo-600/30 transition-all active:scale-95"
                     >
                       <Icon name="plus" className="w-4 h-4" />
                       <span>Добавить ДЗ</span>
@@ -1087,8 +1143,34 @@
                   </div>
                 </div>
 
+                {/* Mobile Column Selector for Kanban */}
+                {taskViewMode === 'kanban' && (
+                  <div className="flex md:hidden items-center p-1 rounded-xl bg-zinc-200/80 dark:bg-zinc-800/80 border border-zinc-300 dark:border-zinc-700 gap-1 text-xs font-bold">
+                    {kanbanColumns.map(col => {
+                      const count = filteredTasks.filter(t => t.status === col.id).length;
+                      const isSelected = mobileKanbanTab === col.id;
+                      return (
+                        <button
+                          key={col.id}
+                          onClick={() => setMobileKanbanTab(col.id)}
+                          className={`flex-1 py-2 px-1.5 rounded-lg transition-all flex items-center justify-center gap-1.5 text-center ${
+                            isSelected
+                              ? 'bg-white dark:bg-zinc-900 text-indigo-600 dark:text-indigo-400 shadow-sm'
+                              : 'text-zinc-500 dark:text-zinc-400'
+                          }`}
+                        >
+                          <span className="truncate">{col.title}</span>
+                          <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${col.badgeColor}`}>
+                            {count}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+
                 {tasks.length === 0 ? (
-                  <div className="py-16 flex flex-col items-center justify-center text-center p-6 border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-2xl bg-white/40 dark:bg-zinc-900/40">
+                  <div className="py-12 sm:py-16 flex flex-col items-center justify-center text-center p-5 border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-2xl bg-white/40 dark:bg-zinc-900/40">
                     <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 flex items-center justify-center text-indigo-500 mb-3">
                       <Icon name="checkCircle" className="w-6 h-6" />
                     </div>
@@ -1101,22 +1183,25 @@
                         setEditingTask(null);
                         setIsTaskModalOpen(true);
                       }}
-                      className="flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs sm:text-sm font-bold shadow-md transition-all active:scale-95"
+                      className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs sm:text-sm font-bold shadow-md transition-all active:scale-95"
                     >
                       <Icon name="plus" className="w-4 h-4" />
                       <span>Создать первое ДЗ</span>
                     </button>
                   </div>
                 ) : taskViewMode === 'kanban' ? (
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
                     {kanbanColumns.map(col => {
                       const colTasks = filteredTasks.filter(t => t.status === col.id);
+                      const isHiddenOnMobile = mobileKanbanTab !== col.id;
                       return (
                         <div
                           key={col.id}
-                          className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800/80 bg-zinc-100/50 dark:bg-zinc-900/40 p-4 backdrop-blur-sm flex flex-col min-h-[500px]"
+                          className={`rounded-2xl border border-zinc-200/80 dark:border-zinc-800/80 bg-zinc-100/50 dark:bg-zinc-900/40 p-3 sm:p-4 backdrop-blur-sm flex-col min-h-[350px] sm:min-h-[500px] ${
+                            isHiddenOnMobile ? 'hidden md:flex' : 'flex'
+                          }`}
                         >
-                          <div className="flex items-center justify-between mb-4">
+                          <div className="flex items-center justify-between mb-3 sm:mb-4">
                             <div className="flex items-center gap-2">
                               <h3 className="font-bold text-sm sm:text-base text-zinc-800 dark:text-zinc-200">
                                 {col.title}
@@ -1131,20 +1216,20 @@
                             {colTasks.map(task => (
                               <div
                                 key={task.id}
-                                className="group relative rounded-xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900/90 p-4 shadow-sm hover:shadow-md transition-all hover:border-indigo-500/50"
+                                className="group relative rounded-xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900/90 p-3.5 sm:p-4 shadow-sm hover:shadow-md transition-all hover:border-indigo-500/50"
                               >
                                 <div className="flex items-start justify-between gap-2 mb-2">
                                   <span className="text-xs font-bold text-indigo-500 dark:text-indigo-400 bg-indigo-500/10 px-2.5 py-0.5 rounded-md">
                                     {task.subject}
                                   </span>
-                                  <div className="flex items-center gap-1 opacity-80 group-hover:opacity-100">
+                                  <div className="flex items-center gap-1 opacity-90 sm:opacity-80 group-hover:opacity-100">
                                     <button
                                       onClick={() => {
                                         setZenTask(task);
                                         setZenOpen(true);
                                       }}
-                                      className="p-1 text-zinc-400 hover:text-indigo-400 rounded-md"
-                                      title="Фокус в Дзен-режиме"
+                                      className="p-1.5 text-zinc-400 hover:text-indigo-400 rounded-md"
+                                      title="Фокусирование"
                                     >
                                       <Icon name="headphones" className="w-3.5 h-3.5" />
                                     </button>
@@ -1153,14 +1238,14 @@
                                         setEditingTask(task);
                                         setIsTaskModalOpen(true);
                                       }}
-                                      className="p-1 text-zinc-400 hover:text-amber-400 rounded-md"
+                                      className="p-1.5 text-zinc-400 hover:text-amber-400 rounded-md"
                                       title="Редактировать"
                                     >
                                       <Icon name="edit" className="w-3.5 h-3.5" />
                                     </button>
                                     <button
                                       onClick={() => handleDeleteTask(task.id)}
-                                      className="p-1 text-zinc-400 hover:text-rose-400 rounded-md"
+                                      className="p-1.5 text-zinc-400 hover:text-rose-400 rounded-md"
                                       title="Удалить"
                                     >
                                       <Icon name="trash" className="w-3.5 h-3.5" />
@@ -1194,11 +1279,11 @@
                                     {task.deadline}
                                   </span>
 
-                                  <div className="flex items-center gap-1">
+                                  <div className="flex items-center gap-1.5">
                                     {col.id !== 'todo' && (
                                       <button
                                         onClick={() => handleTaskStatusChange(task.id, col.id === 'done' ? 'in_progress' : 'todo')}
-                                        className="p-1.5 hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded-lg text-zinc-400 hover:text-zinc-200 font-bold"
+                                        className="p-2 sm:p-1.5 hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded-lg text-zinc-400 hover:text-zinc-200 font-bold"
                                         title="Назад"
                                       >
                                         ←
@@ -1207,10 +1292,10 @@
                                     {col.id !== 'done' && (
                                       <button
                                         onClick={() => handleTaskStatusChange(task.id, col.id === 'todo' ? 'in_progress' : 'done')}
-                                        className="p-1.5 bg-indigo-50 dark:bg-indigo-950/40 hover:bg-indigo-600 hover:text-white rounded-lg text-indigo-400 transition-colors font-bold"
+                                        className="p-2 sm:p-1.5 bg-indigo-50 dark:bg-indigo-950/40 hover:bg-indigo-600 hover:text-white rounded-lg text-indigo-400 transition-colors font-bold text-xs"
                                         title="Вперёд / Сдать"
                                       >
-                                        →
+                                        {col.id === 'in_progress' ? 'Сдать ✓' : 'В работу →'}
                                       </button>
                                     )}
                                   </div>
@@ -1219,7 +1304,7 @@
                             ))}
 
                             {colTasks.length === 0 && (
-                              <div className="h-32 flex flex-col items-center justify-center border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-xl text-zinc-400 text-xs">
+                              <div className="h-28 sm:h-32 flex flex-col items-center justify-center border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-xl text-zinc-400 text-xs">
                                 Нет заданий в этой колонке
                               </div>
                             )}
@@ -1230,8 +1315,8 @@
                   </div>
                 ) : (
                   <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 overflow-hidden shadow-sm">
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-left text-sm">
+                    <div className="overflow-x-auto touch-pan">
+                      <table className="w-full text-left text-sm min-w-[600px]">
                         <thead className="bg-zinc-50 dark:bg-zinc-800/50 text-xs font-semibold text-zinc-500 uppercase tracking-wider border-b border-zinc-200 dark:border-zinc-800">
                           <tr>
                             <th className="px-4 py-3">Статус</th>
@@ -1250,7 +1335,7 @@
                                 <select
                                   value={task.status}
                                   onChange={(e) => handleTaskStatusChange(task.id, e.target.value)}
-                                  className="text-xs rounded-lg px-2.5 py-1 bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 font-semibold focus:outline-none"
+                                  className="text-xs rounded-lg px-2.5 py-1.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 font-semibold focus:outline-none"
                                 >
                                   <option value="todo">К выполнению</option>
                                   <option value="in_progress">В процессе</option>
@@ -1272,13 +1357,13 @@
                                     setEditingTask(task);
                                     setIsTaskModalOpen(true);
                                   }}
-                                  className="text-zinc-400 hover:text-indigo-400 mr-2"
+                                  className="text-zinc-400 hover:text-indigo-400 p-1.5 mr-1"
                                 >
                                   <Icon name="edit" className="w-4 h-4 inline" />
                                 </button>
                                 <button
                                   onClick={() => handleDeleteTask(task.id)}
-                                  className="text-zinc-400 hover:text-rose-400"
+                                  className="text-zinc-400 hover:text-rose-400 p-1.5"
                                 >
                                   <Icon name="trash" className="w-4 h-4 inline" />
                                 </button>
@@ -1295,134 +1380,397 @@
 
             {/* TAB 2: SCHEDULE */}
             {activeTab === 'schedule' && (
-              <div className="space-y-6">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="space-y-4 sm:space-y-6">
+                
+                {/* Header & Sub-tabs Switcher */}
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4">
                   <div>
-                    <h1 className="text-2xl font-black tracking-tight text-zinc-900 dark:text-white">
+                    <h1 className="text-xl sm:text-2xl font-black tracking-tight text-zinc-900 dark:text-white">
                       Расписание уроков
                     </h1>
                     <p className="text-xs sm:text-sm text-zinc-500 dark:text-zinc-400">
-                      Список уроков на день и кто берёт учебник: Рома или Ермолай
+                      {scheduleSubTab === 'daily'
+                        ? 'Поурочный план по дням недели с переменами и дежурством'
+                        : 'Полная недельная сводка: кто и в какой день берёт учебники'}
                     </p>
                   </div>
 
-                  <button
-                    onClick={() => {
-                      setSelectedTextbookDuty('Оба');
-                      setIsClassModalOpen(true);
-                    }}
-                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs sm:text-sm font-bold shadow-md shadow-indigo-600/30 transition-all self-start active:scale-95"
-                  >
-                    <Icon name="plus" className="w-4 h-4" />
-                    <span>Добавить урок</span>
-                  </button>
-                </div>
+                  {/* Sub-tab Pills (По дням / Учебники) and Add Lesson Button */}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className="flex items-center p-1 rounded-2xl bg-zinc-200/80 dark:bg-zinc-800/80 border border-zinc-300 dark:border-zinc-700 text-xs sm:text-sm font-bold">
+                      <button
+                        onClick={() => setScheduleSubTab('daily')}
+                        className={`flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-xl transition-all ${
+                          scheduleSubTab === 'daily'
+                            ? 'bg-white dark:bg-zinc-900 text-indigo-600 dark:text-indigo-400 shadow-sm'
+                            : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'
+                        }`}
+                      >
+                        <Icon name="calendar" className="w-3.5 h-3.5 text-violet-500" />
+                        <span>По дням</span>
+                      </button>
 
-                <div className="flex items-center gap-2 overflow-x-auto pb-2">
-                  {['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'].map(day => (
-                    <button
-                      key={day}
-                      onClick={() => setSelectedDay(day)}
-                      className={`px-5 py-2.5 rounded-xl font-bold text-sm transition-all whitespace-nowrap ${
-                        selectedDay === day
-                          ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 scale-105'
-                          : 'bg-zinc-100 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-800'
-                      }`}
-                    >
-                      {day} ({schedule[day]?.length || 0} уроков)
-                    </button>
-                  ))}
-                </div>
-
-                {/* Vertical Schedule Going Downwards */}
-                <div className="flex flex-col gap-3 max-w-3xl">
-                  {(schedule[selectedDay] || []).map((cls, idx) => {
-                    const prevCls = idx > 0 ? (schedule[selectedDay] || [])[idx - 1] : null;
-                    const breakText = getBreakText(cls, prevCls);
-                    const isBigBreak = breakText && breakText.toLowerCase().includes('большая');
-
-                    return (
-                      <React.Fragment key={cls.id}>
-                        {}
-                        {breakText && (
-                          <div className="flex items-center gap-2.5 px-1 py-1 -mb-1">
-                            <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border shadow-xs transition-all ${
-                              isBigBreak
-                                ? 'bg-amber-500/15 text-amber-500 dark:text-amber-400 border-amber-500/30'
-                                : 'bg-zinc-100 dark:bg-zinc-800/90 text-zinc-500 dark:text-zinc-400 border-zinc-200 dark:border-zinc-700/60'
-                            }`}>
-                              <Icon name="coffee" className={`w-3.5 h-3.5 ${isBigBreak ? 'text-amber-500' : 'text-zinc-400'}`} />
-                              <span>{breakText}</span>
-                            </div>
-                            <div className="h-px bg-zinc-200/80 dark:bg-zinc-800 flex-1"></div>
-                          </div>
-                        )}
-
-                        <div
-                          className="relative group rounded-2xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-zinc-900/80 p-4 sm:p-5 shadow-sm hover:shadow-md transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4 overflow-hidden"
-                        >
-                          <div className="flex items-center gap-4">
-                            <div className="w-10 h-10 rounded-xl bg-indigo-500/10 dark:bg-indigo-500/20 border border-indigo-500/20 flex flex-col items-center justify-center shrink-0">
-                              <span className="text-[10px] uppercase font-bold text-indigo-400 leading-none">Урок</span>
-                              <span className="text-base font-black text-indigo-600 dark:text-indigo-300 leading-none mt-0.5">{idx + 1}</span>
-                            </div>
-
-                            <div>
-                              <div className="flex items-center gap-2 mb-1">
-                                <span className="px-2.5 py-0.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 font-mono text-xs font-bold flex items-center gap-1.5">
-                                  <Icon name="clock" className="w-3 h-3 text-indigo-400" />
-                                  {cls.time}
-                                </span>
-                              </div>
-                              <h3 className="font-bold text-base sm:text-lg text-zinc-900 dark:text-white leading-snug">
-                                {cls.name}
-                              </h3>
-                            </div>
-                          </div>
-
-                          <div className="flex items-center justify-between sm:justify-end gap-3 pt-2 sm:pt-0 border-t sm:border-t-0 border-zinc-100 dark:border-zinc-800">
-                            {getTextbookBadge(cls.textbookDuty)}
-
-                            <button
-                              onClick={() => handleDeleteClass(selectedDay, cls.id)}
-                              className="opacity-70 group-hover:opacity-100 text-zinc-400 hover:text-rose-400 transition-all p-2 rounded-lg hover:bg-rose-500/10"
-                              title="Удалить урок"
-                            >
-                              <Icon name="trash" className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </div>
-                      </React.Fragment>
-                    );
-                  })}
-
-                  {(schedule[selectedDay] || []).length === 0 && (
-                    <div className="py-14 flex flex-col items-center justify-center text-zinc-400 border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-2xl bg-white/30 dark:bg-zinc-900/30">
-                      <Icon name="coffee" className="w-9 h-9 mb-2 opacity-50 text-indigo-400" />
-                      <p className="font-bold text-sm text-zinc-700 dark:text-zinc-300">В этот день уроков нет</p>
-                      <p className="text-xs text-zinc-400 mt-1">Отличный повод отдохнуть или сделать домашку заранее</p>
+                      <button
+                        onClick={() => setScheduleSubTab('textbooks')}
+                        className={`flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-xl transition-all ${
+                          scheduleSubTab === 'textbooks'
+                            ? 'bg-white dark:bg-zinc-900 text-indigo-600 dark:text-indigo-400 shadow-sm'
+                            : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'
+                        }`}
+                      >
+                        <Icon name="book" className="w-3.5 h-3.5 text-amber-500" />
+                        <span>Учебники</span>
+                        <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-indigo-500/15 text-indigo-400 font-extrabold">
+                          {textbookStats.total}
+                        </span>
+                      </button>
                     </div>
-                  )}
+
+                    <button
+                      onClick={() => {
+                        setSelectedTextbookDuty('Оба');
+                        setIsClassModalOpen(true);
+                      }}
+                      className="flex items-center justify-center gap-1.5 px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs sm:text-sm font-bold shadow-md shadow-indigo-600/30 transition-all active:scale-95 ml-auto sm:ml-0"
+                    >
+                      <Icon name="plus" className="w-4 h-4" />
+                      <span>Добавить урок</span>
+                    </button>
+                  </div>
                 </div>
+
+                {/* SUB-VIEW 1: DAILY VIEW */}
+                {scheduleSubTab === 'daily' && (
+                  <div className="space-y-4">
+                    {/* Day selector */}
+                    <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto no-scrollbar pb-1.5 touch-pan">
+                      {['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'].map(day => (
+                        <button
+                          key={day}
+                          onClick={() => setSelectedDay(day)}
+                          className={`px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all whitespace-nowrap ${
+                            selectedDay === day
+                              ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30 scale-105'
+                              : 'bg-zinc-100 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-800'
+                          }`}
+                        >
+                          {day} ({schedule[day]?.length || 0})
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Vertical Schedule Going Downwards */}
+                    <div className="flex flex-col gap-2.5 sm:gap-3 max-w-3xl">
+                      {(schedule[selectedDay] || []).map((cls, idx) => {
+                        const prevCls = idx > 0 ? (schedule[selectedDay] || [])[idx - 1] : null;
+                        const breakText = getBreakText(cls, prevCls);
+                        const isBigBreak = breakText && breakText.toLowerCase().includes('большая');
+
+                        return (
+                          <React.Fragment key={cls.id}>
+                            {breakText && (
+                              <div className="flex items-center gap-2 px-1 py-0.5">
+                                <div className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 sm:px-3 sm:py-1 rounded-full text-[11px] sm:text-xs font-bold border shadow-xs transition-all ${
+                                  isBigBreak
+                                    ? 'bg-amber-500/15 text-amber-500 dark:text-amber-400 border-amber-500/30'
+                                    : 'bg-zinc-100 dark:bg-zinc-800/90 text-zinc-500 dark:text-zinc-400 border-zinc-200 dark:border-zinc-700/60'
+                                }`}>
+                                  <Icon name="coffee" className={`w-3 h-3 sm:w-3.5 sm:h-3.5 ${isBigBreak ? 'text-amber-500' : 'text-zinc-400'}`} />
+                                  <span>{breakText}</span>
+                                </div>
+                                <div className="h-px bg-zinc-200/80 dark:bg-zinc-800 flex-1"></div>
+                              </div>
+                            )}
+
+                            <div
+                              className="relative group rounded-2xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-zinc-900/80 p-3.5 sm:p-5 shadow-sm hover:shadow-md transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 overflow-hidden"
+                            >
+                              <div className="flex items-center gap-3 sm:gap-4">
+                                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-indigo-500/10 dark:bg-indigo-500/20 border border-indigo-500/20 flex flex-col items-center justify-center shrink-0">
+                                  <span className="text-[9px] uppercase font-bold text-indigo-400 leading-none">Урок</span>
+                                  <span className="text-sm sm:text-base font-black text-indigo-600 dark:text-indigo-300 leading-none mt-0.5">{idx + 1}</span>
+                                </div>
+
+                                <div className="min-w-0">
+                                  <div className="flex items-center gap-2 mb-0.5">
+                                    <span className="px-2 py-0.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 font-mono text-[11px] sm:text-xs font-bold flex items-center gap-1.5">
+                                      <Icon name="clock" className="w-3 h-3 text-indigo-400" />
+                                      {cls.time}
+                                    </span>
+                                  </div>
+                                  <h3 className="font-bold text-sm sm:text-lg text-zinc-900 dark:text-white leading-snug truncate">
+                                    {cls.name}
+                                  </h3>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center justify-between sm:justify-end gap-2 pt-2 sm:pt-0 border-t sm:border-t-0 border-zinc-100 dark:border-zinc-800">
+                                {getTextbookBadge(cls.textbookDuty)}
+
+                                <button
+                                  onClick={() => handleDeleteClass(selectedDay, cls.id)}
+                                  className="text-zinc-400 hover:text-rose-400 transition-all p-2 rounded-lg hover:bg-rose-500/10"
+                                  title="Удалить урок"
+                                >
+                                  <Icon name="trash" className="w-4 h-4" />
+                                </button>
+                              </div>
+                            </div>
+                          </React.Fragment>
+                        );
+                      })}
+
+                      {(schedule[selectedDay] || []).length === 0 && (
+                        <div className="py-12 sm:py-14 flex flex-col items-center justify-center text-zinc-400 border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-2xl bg-white/30 dark:bg-zinc-900/30">
+                          <Icon name="coffee" className="w-8 h-8 sm:w-9 sm:h-9 mb-2 opacity-50 text-indigo-400" />
+                          <p className="font-bold text-sm text-zinc-700 dark:text-zinc-300">В этот день уроков нет</p>
+                          <p className="text-xs text-zinc-400 mt-1">Отличный повод отдохнуть или сделать домашку заранее</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* SUB-VIEW 2: FULL TEXTBOOKS SCHEDULE */}
+                {scheduleSubTab === 'textbooks' && (
+                  <div className="space-y-4 sm:space-y-6">
+                    
+                    {/* KPI Summary Cards */}
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
+                      
+                      {/* Рома */}
+                      <div className="rounded-2xl border border-sky-500/30 bg-sky-500/10 dark:bg-sky-950/20 p-3.5 sm:p-4.5">
+                        <div className="flex items-center justify-between text-sky-600 dark:text-sky-300 text-[10px] sm:text-xs font-bold uppercase tracking-wider mb-1">
+                          <span>Берёт Рома</span>
+                          <span className="w-2.5 h-2.5 rounded-full bg-sky-400 animate-pulse"></span>
+                        </div>
+                        <div className="flex items-baseline gap-1.5">
+                          <span className="text-2xl sm:text-3xl font-black text-sky-600 dark:text-sky-300">
+                            {textbookStats.roma}
+                          </span>
+                          <span className="text-xs font-semibold text-sky-500/80">книг(и) в неделю</span>
+                        </div>
+                      </div>
+
+                      {/* Ермолай */}
+                      <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 dark:bg-amber-950/20 p-3.5 sm:p-4.5">
+                        <div className="flex items-center justify-between text-amber-600 dark:text-amber-300 text-[10px] sm:text-xs font-bold uppercase tracking-wider mb-1">
+                          <span>Берёт Ермолай</span>
+                          <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse"></span>
+                        </div>
+                        <div className="flex items-baseline gap-1.5">
+                          <span className="text-2xl sm:text-3xl font-black text-amber-600 dark:text-amber-300">
+                            {textbookStats.ermolay}
+                          </span>
+                          <span className="text-xs font-semibold text-amber-500/80">книг(и) в неделю</span>
+                        </div>
+                      </div>
+
+                      {/* Оба */}
+                      <div className="rounded-2xl border border-violet-500/30 bg-violet-500/10 dark:bg-violet-950/20 p-3.5 sm:p-4.5">
+                        <div className="flex items-center justify-between text-violet-600 dark:text-violet-300 text-[10px] sm:text-xs font-bold uppercase tracking-wider mb-1">
+                          <span>Берут оба</span>
+                          <span className="w-2.5 h-2.5 rounded-full bg-violet-400"></span>
+                        </div>
+                        <div className="flex items-baseline gap-1.5">
+                          <span className="text-2xl sm:text-3xl font-black text-violet-600 dark:text-violet-300">
+                            {textbookStats.both}
+                          </span>
+                          <span className="text-xs font-semibold text-violet-500/80">уроков</span>
+                        </div>
+                      </div>
+
+                      {/* Без учебника */}
+                      <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-zinc-100/70 dark:bg-zinc-900/60 p-3.5 sm:p-4.5">
+                        <div className="flex items-center justify-between text-zinc-500 dark:text-zinc-400 text-[10px] sm:text-xs font-bold uppercase tracking-wider mb-1">
+                          <span>Без учебника</span>
+                          <span className="w-2.5 h-2.5 rounded-full bg-zinc-400"></span>
+                        </div>
+                        <div className="flex items-baseline gap-1.5">
+                          <span className="text-2xl sm:text-3xl font-black text-zinc-700 dark:text-zinc-200">
+                            {textbookStats.none}
+                          </span>
+                          <span className="text-xs font-semibold text-zinc-400">уроков</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Backpack Filter Controls */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 p-3 rounded-2xl bg-zinc-100/80 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800">
+                      <div className="flex items-center gap-2 text-xs font-bold text-zinc-600 dark:text-zinc-300">
+                        <Icon name="book" className="w-4 h-4 text-indigo-500" />
+                        <span>Сбор рюкзака:</span>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {[
+                          { id: 'all', label: 'Все уроки' },
+                          { id: 'Рома', label: '🎒 Только Рома', color: 'text-sky-500' },
+                          { id: 'Ермолай', label: '🎒 Только Ермолай', color: 'text-amber-500' },
+                          { id: 'Оба', label: 'Оба', color: 'text-violet-500' },
+                          { id: 'Без учебника', label: 'Без учебника' },
+                        ].map(f => {
+                          const isActive = textbookFilter === f.id;
+                          return (
+                            <button
+                              key={f.id}
+                              onClick={() => setTextbookFilter(f.id)}
+                              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                                isActive
+                                  ? 'bg-indigo-600 text-white shadow-sm scale-105'
+                                  : 'bg-white dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white border border-zinc-200 dark:border-zinc-700/60'
+                              }`}
+                            >
+                              {f.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* FULL WEEKLY SCHEDULE GRID ACROSS ALL DAYS */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-5">
+                      {[
+                        { code: 'Пн', name: 'Понедельник' },
+                        { code: 'Вт', name: 'Вторник' },
+                        { code: 'Ср', name: 'Среда' },
+                        { code: 'Чт', name: 'Четверг' },
+                        { code: 'Пт', name: 'Пятница' },
+                        { code: 'Сб', name: 'Суббота' }
+                      ].map(dayInfo => {
+                        const dayClasses = schedule[dayInfo.code] || [];
+                        const filteredDayClasses = dayClasses.filter(c => {
+                          if (textbookFilter === 'all') return true;
+                          if (textbookFilter === 'Рома') return c.textbookDuty === 'Рома' || c.textbookDuty === 'Оба';
+                          if (textbookFilter === 'Ермолай') return c.textbookDuty === 'Ермолай' || c.textbookDuty === 'Оба';
+                          return c.textbookDuty === textbookFilter;
+                        });
+
+                        const dayRomaCount = dayClasses.filter(c => c.textbookDuty === 'Рома' || c.textbookDuty === 'Оба').length;
+                        const dayErmolayCount = dayClasses.filter(c => c.textbookDuty === 'Ермолай' || c.textbookDuty === 'Оба').length;
+
+                        return (
+                          <div
+                            key={dayInfo.code}
+                            className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-zinc-900/80 shadow-sm flex flex-col overflow-hidden"
+                          >
+                            {/* Day Header */}
+                            <div className="px-4 py-3 bg-zinc-50/80 dark:bg-zinc-800/50 border-b border-zinc-200/80 dark:border-zinc-800 flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <span className="w-7 h-7 rounded-lg bg-indigo-500/15 text-indigo-500 dark:text-indigo-400 font-black text-xs flex items-center justify-center">
+                                  {dayInfo.code}
+                                </span>
+                                <h3 className="font-bold text-sm sm:text-base text-zinc-900 dark:text-white">
+                                  {dayInfo.name}
+                                </h3>
+                              </div>
+
+                              {/* Daily duty quick counters */}
+                              <div className="flex items-center gap-1.5 text-[11px] font-bold">
+                                {dayRomaCount > 0 && (
+                                  <span className="px-2 py-0.5 rounded-md bg-sky-500/15 text-sky-500 dark:text-sky-300 border border-sky-500/20" title={`Рома берёт ${dayRomaCount} учебников`}>
+                                    Р: {dayRomaCount}
+                                  </span>
+                                )}
+                                {dayErmolayCount > 0 && (
+                                  <span className="px-2 py-0.5 rounded-md bg-amber-500/15 text-amber-500 dark:text-amber-300 border border-amber-500/20" title={`Ермолай берёт ${dayErmolayCount} учебников`}>
+                                    Е: {dayErmolayCount}
+                                  </span>
+                                )}
+                                {dayClasses.length === 0 && (
+                                  <span className="text-zinc-400 text-xs">Выходной</span>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Lesson rows with textbook duties */}
+                            <div className="p-3 sm:p-3.5 space-y-2 flex-1">
+                              {filteredDayClasses.map((cls, idx) => (
+                                <div
+                                  key={cls.id}
+                                  className="p-2.5 sm:p-3 rounded-xl border border-zinc-100 dark:border-zinc-800 bg-zinc-50/60 dark:bg-zinc-800/40 flex items-center justify-between gap-2.5 hover:border-indigo-500/40 transition-colors"
+                                >
+                                  <div className="flex items-center gap-2.5 min-w-0">
+                                    <span className="w-5 h-5 rounded-md bg-zinc-200 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300 font-bold text-[10px] flex items-center justify-center shrink-0">
+                                      {idx + 1}
+                                    </span>
+                                    <div className="min-w-0">
+                                      <div className="text-xs font-bold text-zinc-900 dark:text-zinc-100 truncate">
+                                        {cls.name}
+                                      </div>
+                                      <div className="text-[10px] font-mono text-zinc-400">
+                                        {cls.time}
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  <div className="shrink-0">
+                                    {getTextbookBadge(cls.textbookDuty)}
+                                  </div>
+                                </div>
+                              ))}
+
+                              {/* Empty states for the day */}
+                              {dayClasses.length === 0 && (
+                                <div className="py-8 text-center text-xs text-zinc-400 border border-dashed border-zinc-200 dark:border-zinc-800 rounded-xl">
+                                  Уроков нет
+                                </div>
+                              )}
+
+                              {dayClasses.length > 0 && filteredDayClasses.length === 0 && (
+                                <div className="py-6 text-center text-xs text-zinc-400 border border-dashed border-zinc-200 dark:border-zinc-800 rounded-xl">
+                                  Нет уроков по выбранному фильтру
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Overall empty state if schedule has 0 classes */}
+                    {textbookStats.total === 0 && (
+                      <div className="py-12 flex flex-col items-center justify-center text-center p-6 border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-2xl bg-white/40 dark:bg-zinc-900/40">
+                        <Icon name="book" className="w-10 h-10 text-indigo-400 mb-2 opacity-60" />
+                        <h4 className="text-base font-bold text-zinc-800 dark:text-zinc-200">Расписание пока не заполнено</h4>
+                        <p className="text-xs text-zinc-400 max-w-sm mt-1 mb-4">
+                          Добавьте уроки в расписание и укажите, кто берёт учебник: Рома или Ермолай. Они сразу появятся в этой сводке!
+                        </p>
+                        <button
+                          onClick={() => {
+                            setSelectedTextbookDuty('Оба');
+                            setIsClassModalOpen(true);
+                          }}
+                          className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs sm:text-sm font-bold shadow-md transition-all active:scale-95"
+                        >
+                          <Icon name="plus" className="w-4 h-4" />
+                          <span>Добавить первый урок</span>
+                        </button>
+                      </div>
+                    )}
+
+                  </div>
+                )}
+
               </div>
             )}
 
             {/* TAB 3: GRADES & RESOURCES */}
             {activeTab === 'grades' && (
-              <div className="space-y-6">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="space-y-4 sm:space-y-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
                   <div>
-                    <h1 className="text-2xl font-black tracking-tight text-zinc-900 dark:text-white">
-                      Успеваемость и Банк учебных материалов
+                    <h1 className="text-xl sm:text-2xl font-black tracking-tight text-zinc-900 dark:text-white">
+                      Успеваемость и материалы
                     </h1>
                     <p className="text-xs sm:text-sm text-zinc-500 dark:text-zinc-400">
-                      Калькулятор среднего балла, расчет пятерок до цели и быстрый доступ к материалам
+                      Калькулятор среднего балла, расчет пятерок до цели и банк ссылок
                     </p>
                   </div>
 
                   <button
                     onClick={() => setIsSubjectModalOpen(true)}
-                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs sm:text-sm font-bold shadow-md shadow-indigo-600/30 transition-all self-start active:scale-95"
+                    className="flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs sm:text-sm font-bold shadow-md shadow-indigo-600/30 transition-all self-stretch sm:self-start active:scale-95"
                   >
                     <Icon name="plus" className="w-4 h-4" />
                     <span>Добавить предмет</span>
@@ -1430,7 +1778,7 @@
                 </div>
 
                 {subjects.length === 0 ? (
-                  <div className="py-16 flex flex-col items-center justify-center text-center p-6 border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-2xl bg-white/40 dark:bg-zinc-900/40">
+                  <div className="py-12 sm:py-16 flex flex-col items-center justify-center text-center p-5 border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-2xl bg-white/40 dark:bg-zinc-900/40">
                     <div className="w-12 h-12 rounded-2xl bg-amber-500/10 flex items-center justify-center text-amber-500 mb-3">
                       <Icon name="award" className="w-6 h-6" />
                     </div>
@@ -1440,14 +1788,14 @@
                     </p>
                     <button
                       onClick={() => setIsSubjectModalOpen(true)}
-                      className="flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs sm:text-sm font-bold shadow-md transition-all active:scale-95"
+                      className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs sm:text-sm font-bold shadow-md transition-all active:scale-95"
                     >
                       <Icon name="plus" className="w-4 h-4" />
                       <span>Добавить первый предмет</span>
                     </button>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
                     {subjects.map(subject => {
                       const count = subject.grades.length;
                       const sum = subject.grades.reduce((a, b) => a + b, 0);
@@ -1457,17 +1805,17 @@
                       return (
                         <div
                           key={subject.id}
-                          className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-zinc-900/80 p-5 shadow-sm space-y-4 relative group"
+                          className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-zinc-900/80 p-4 sm:p-5 shadow-sm space-y-3.5 relative group"
                         >
                           <div className="flex items-start justify-between gap-3">
                             <div>
                               <div className="flex items-center gap-2">
-                                <h3 className="font-bold text-lg text-zinc-900 dark:text-white">
+                                <h3 className="font-bold text-base sm:text-lg text-zinc-900 dark:text-white">
                                   {subject.name}
                                 </h3>
                                 <button
                                   onClick={() => handleDeleteSubject(subject.id)}
-                                  className="opacity-0 group-hover:opacity-100 text-zinc-400 hover:text-rose-400 transition-all p-1"
+                                  className="text-zinc-400 hover:text-rose-400 transition-all p-1"
                                   title="Удалить предмет"
                                 >
                                   <Icon name="trash" className="w-3.5 h-3.5" />
@@ -1480,7 +1828,7 @@
 
                             <div className="text-right">
                               <div
-                                className={`text-2xl font-black px-3.5 py-1 rounded-xl inline-block ${
+                                className={`text-xl sm:text-2xl font-black px-3 py-1 rounded-xl inline-block ${
                                   Number(average) >= 4.5
                                     ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
                                     : Number(average) >= 3.75
@@ -1492,7 +1840,7 @@
                               >
                                 {average}
                               </div>
-                              <div className="text-[10px] text-zinc-400 uppercase tracking-wider font-bold mt-1">
+                              <div className="text-[9px] sm:text-[10px] text-zinc-400 uppercase tracking-wider font-bold mt-0.5">
                                 Средний балл
                               </div>
                             </div>
@@ -1505,7 +1853,7 @@
                               {count > 0 && (
                                 <button
                                   onClick={() => handleRemoveLastGrade(subject.id)}
-                                  className="text-[11px] text-rose-400 hover:underline"
+                                  className="text-[11px] text-rose-400 hover:underline p-1"
                                 >
                                   Удалить последнюю
                                 </button>
@@ -1529,12 +1877,12 @@
                                 </span>
                               ))}
 
-                              <div className="flex items-center gap-1 ml-2">
+                              <div className="flex items-center gap-1 ml-1 sm:ml-2">
                                 {[5, 4, 3, 2].map(num => (
                                   <button
                                     key={num}
                                     onClick={() => handleAddGrade(subject.id, num)}
-                                    className="px-2 py-1 text-xs rounded-md bg-zinc-100 dark:bg-zinc-800 hover:bg-indigo-600 hover:text-white transition-colors font-bold"
+                                    className="px-2.5 py-1.5 text-xs rounded-md bg-zinc-100 dark:bg-zinc-800 hover:bg-indigo-600 hover:text-white transition-colors font-bold active:scale-95"
                                   >
                                     +{num}
                                   </button>
@@ -1578,7 +1926,7 @@
                                   const url = prompt('Ссылка (URL):');
                                   if (title && url) handleAddResource(subject.id, title, url);
                                 }}
-                                className="text-[11px] text-indigo-400 hover:underline flex items-center gap-1 font-semibold"
+                                className="text-[11px] text-indigo-400 hover:underline flex items-center gap-1 font-semibold p-1"
                               >
                                 <Icon name="plus" className="w-3 h-3" /> Добавить
                               </button>
@@ -1610,28 +1958,28 @@
               </div>
             )}
 
-            {/* TAB 4: ACTIVITY & PRODUCTIVITY (MOVED TO THE LAST TAB) */}
+            {/* TAB 4: ACTIVITY & PRODUCTIVITY */}
             {activeTab === 'analytics' && (
-              <div className="space-y-6">
+              <div className="space-y-4 sm:space-y-6">
                 
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
                   <div>
                     <div className="flex items-center gap-2">
-                      <h1 className="text-2xl font-black tracking-tight text-zinc-900 dark:text-white">
+                      <h1 className="text-xl sm:text-2xl font-black tracking-tight text-zinc-900 dark:text-white">
                         Активность и продуктивность
                       </h1>
-                      <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                      <span className="px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
                         Live Sync
                       </span>
                     </div>
                     <p className="text-xs sm:text-sm text-zinc-500 dark:text-zinc-400">
-                      Сетка выполненных заданий в стиле коммитов GitHub, непрерывные стрики и история продуктивности
+                      Сетка выполненных заданий в стиле коммитов GitHub и стрики
                     </p>
                   </div>
 
                   <button
                     onClick={() => setSelectedDateForDetails(toDateKey(new Date()))}
-                    className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs sm:text-sm font-bold shadow-md shadow-emerald-600/30 transition-all self-start active:scale-95"
+                    className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs sm:text-sm font-bold shadow-md shadow-emerald-600/30 transition-all self-stretch sm:self-start active:scale-95"
                   >
                     <Icon name="plus" className="w-4 h-4" />
                     <span>Добавить активность за сегодня</span>
@@ -1639,174 +1987,179 @@
                 </div>
 
                 {/* Metric Summary Cards */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
                   
-                  <div className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900/80 p-5 shadow-sm">
-                    <div className="flex items-center justify-between text-zinc-400 text-xs font-bold uppercase tracking-wider mb-2">
-                      <span>Текущий стрик</span>
-                      <Icon name="flame" className="w-4 h-4 text-amber-500" />
+                  <div className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900/80 p-3.5 sm:p-5 shadow-sm">
+                    <div className="flex items-center justify-between text-zinc-400 text-[10px] sm:text-xs font-bold uppercase tracking-wider mb-1 sm:mb-2">
+                      <span>Стрик</span>
+                      <Icon name="flame" className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-500" />
                     </div>
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-3xl sm:text-4xl font-black text-amber-500">
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="text-2xl sm:text-4xl font-black text-amber-500">
                         {productivityStats.currentStreak}
                       </span>
-                      <span className="text-sm font-bold text-zinc-400">дней подряд</span>
+                      <span className="text-xs sm:text-sm font-bold text-zinc-400">дней</span>
                     </div>
-                    <p className="text-xs text-zinc-500 mt-2">
-                      {productivityStats.currentStreak >= 1 ? '🔥 Прекрасный темп! Цепочка не прерывается!' : '⚡ Выполните задачу сегодня, чтобы начать стрик!'}
+                    <p className="text-[10px] sm:text-xs text-zinc-500 mt-1 sm:mt-2 truncate">
+                      {productivityStats.currentStreak >= 1 ? '🔥 Цепочка активна!' : '⚡ Сделайте задачу!'}
                     </p>
                   </div>
 
-                  <div className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900/80 p-5 shadow-sm">
-                    <div className="flex items-center justify-between text-zinc-400 text-xs font-bold uppercase tracking-wider mb-2">
-                      <span>Рекордный стрик</span>
-                      <Icon name="award" className="w-4 h-4 text-indigo-400" />
+                  <div className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900/80 p-3.5 sm:p-5 shadow-sm">
+                    <div className="flex items-center justify-between text-zinc-400 text-[10px] sm:text-xs font-bold uppercase tracking-wider mb-1 sm:mb-2">
+                      <span>Рекорд</span>
+                      <Icon name="award" className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-indigo-400" />
                     </div>
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-3xl sm:text-4xl font-black text-indigo-500">
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="text-2xl sm:text-4xl font-black text-indigo-500">
                         {productivityStats.recordStreak}
                       </span>
-                      <span className="text-sm font-bold text-zinc-400">дней макс.</span>
+                      <span className="text-xs sm:text-sm font-bold text-zinc-400">макс.</span>
                     </div>
-                    <p className="text-xs text-zinc-500 mt-2">
-                      Лучший личный результат за всё время
+                    <p className="text-[10px] sm:text-xs text-zinc-500 mt-1 sm:mt-2 truncate">
+                      Лучший личный стрик
                     </p>
                   </div>
 
-                  <div className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900/80 p-5 shadow-sm">
-                    <div className="flex items-center justify-between text-zinc-400 text-xs font-bold uppercase tracking-wider mb-2">
-                      <span>Закрыто на неделе</span>
-                      <Icon name="checkCircle" className="w-4 h-4 text-emerald-500" />
+                  <div className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900/80 p-3.5 sm:p-5 shadow-sm">
+                    <div className="flex items-center justify-between text-zinc-400 text-[10px] sm:text-xs font-bold uppercase tracking-wider mb-1 sm:mb-2">
+                      <span>На неделе</span>
+                      <Icon name="checkCircle" className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-500" />
                     </div>
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-3xl sm:text-4xl font-black text-emerald-500">
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="text-2xl sm:text-4xl font-black text-emerald-500">
                         {productivityStats.thisWeekCount}
                       </span>
-                      <span className="text-xs font-semibold text-zinc-400">/ {productivityStats.totalAllTime} всего</span>
+                      <span className="text-[10px] sm:text-xs font-semibold text-zinc-400 truncate">/ {productivityStats.totalAllTime}</span>
                     </div>
-                    <p className="text-xs text-zinc-500 mt-2">
-                      Задач и учебных блоков выполнено
+                    <p className="text-[10px] sm:text-xs text-zinc-500 mt-1 sm:mt-2 truncate">
+                      Выполнено дел
                     </p>
                   </div>
 
-                  <div className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900/80 p-5 shadow-sm">
-                    <div className="flex items-center justify-between text-zinc-400 text-xs font-bold uppercase tracking-wider mb-2">
+                  <div className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900/80 p-3.5 sm:p-5 shadow-sm">
+                    <div className="flex items-center justify-between text-zinc-400 text-[10px] sm:text-xs font-bold uppercase tracking-wider mb-1 sm:mb-2">
                       <span>Пиковый день</span>
-                      <Icon name="zap" className="w-4 h-4 text-cyan-400" />
+                      <Icon name="zap" className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-cyan-400" />
                     </div>
-                    <div className="text-base sm:text-lg font-black text-zinc-900 dark:text-white truncate">
+                    <div className="text-sm sm:text-lg font-black text-zinc-900 dark:text-white truncate">
                       {productivityStats.bestDayText.split(' ')[0]}
                     </div>
-                    <p className="text-xs text-zinc-500 mt-2">
-                      Самая высокая концентрация и продуктивность
+                    <p className="text-[10px] sm:text-xs text-zinc-500 mt-1 sm:mt-2 truncate">
+                      Макс. продуктивность
                     </p>
                   </div>
                 </div>
 
-                {/* 18-Week Interactive Heatmap */}
-                <div className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900/80 p-6 shadow-sm space-y-4">
+                {/* 18-Week Interactive Heatmap with Touch-Pan */}
+                <div className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900/80 p-4 sm:p-6 shadow-sm space-y-3 sm:space-y-4">
                   
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-zinc-100 dark:border-zinc-800/80">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-zinc-100 dark:border-zinc-800/80">
                     <div className="flex items-center gap-2">
-                      <Icon name="barChart" className="w-5 h-5 text-emerald-500" />
-                      <h3 className="font-bold text-base text-zinc-900 dark:text-zinc-100">
-                        Карта учебной активности за 18 недель
+                      <Icon name="barChart" className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-500" />
+                      <h3 className="font-bold text-sm sm:text-base text-zinc-900 dark:text-zinc-100">
+                        Карта учебной активности (18 недель)
                       </h3>
                     </div>
 
-                    <div className="flex items-center gap-2 text-xs text-zinc-500 font-medium">
+                    <div className="flex items-center gap-2 text-[11px] sm:text-xs text-zinc-500 font-medium">
                       <span>Меньше</span>
                       <div className="flex items-center gap-1">
-                        <span className="w-3 h-3 rounded-sm bg-zinc-100 dark:bg-zinc-800 border border-zinc-200/60 dark:border-zinc-700/40" title="0 заданий" />
-                        <span className="w-3 h-3 rounded-sm bg-emerald-300 dark:bg-emerald-900 border border-emerald-400 dark:border-emerald-700" title="1 задание" />
-                        <span className="w-3 h-3 rounded-sm bg-emerald-400 dark:bg-emerald-700 border border-emerald-500" title="2 задания" />
-                        <span className="w-3 h-3 rounded-sm bg-emerald-500 dark:bg-emerald-500" title="3 задания" />
-                        <span className="w-3 h-3 rounded-sm bg-emerald-400 dark:bg-emerald-400 border border-emerald-200 shadow-sm shadow-emerald-400/50" title="4+ задания" />
+                        <span className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-sm bg-zinc-100 dark:bg-zinc-800 border border-zinc-200/60 dark:border-zinc-700/40" />
+                        <span className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-sm bg-emerald-300 dark:bg-emerald-900 border border-emerald-400 dark:border-emerald-700" />
+                        <span className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-sm bg-emerald-400 dark:bg-emerald-700 border border-emerald-500" />
+                        <span className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-sm bg-emerald-500 dark:bg-emerald-500" />
+                        <span className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-sm bg-emerald-400 dark:bg-emerald-400 border border-emerald-200 shadow-sm shadow-emerald-400/50" />
                       </div>
                       <span>Больше</span>
                     </div>
                   </div>
 
-                  <div className="overflow-x-auto pb-3">
-                    <div className="min-w-[760px] select-none">
-                      
-                      {/* Month Headers */}
-                      <div className="flex text-[11px] font-semibold text-zinc-400 pl-7 mb-1.5 h-4">
-                        {heatmapData.weeks.map((_, idx) => {
-                          const header = heatmapData.monthHeaders.find(h => h.weekIndex === idx);
-                          return (
-                            <div key={idx} className="w-3.5 mr-1.5 shrink-0 text-left">
-                              {header ? header.title : ''}
-                            </div>
-                          );
-                        })}
-                      </div>
-
-                      {/* Day Columns */}
-                      <div className="flex">
-                        <div className="flex flex-col justify-between text-[10px] font-bold text-zinc-400 pr-2 h-[105px] py-0.5">
-                          <span>Пн</span>
-                          <span>Ср</span>
-                          <span>Пт</span>
+                  <div className="relative">
+                    <div
+                      ref={heatmapScrollRef}
+                      className="overflow-x-auto touch-pan pb-2 select-none"
+                    >
+                      <div className="min-w-[760px]">
+                        
+                        {/* Month Headers */}
+                        <div className="flex text-[11px] font-semibold text-zinc-400 pl-7 mb-1.5 h-4">
+                          {heatmapData.weeks.map((_, idx) => {
+                            const header = heatmapData.monthHeaders.find(h => h.weekIndex === idx);
+                            return (
+                              <div key={idx} className="w-3.5 mr-1.5 shrink-0 text-left">
+                                {header ? header.title : ''}
+                              </div>
+                            );
+                          })}
                         </div>
 
-                        <div className="flex gap-1.5">
-                          {heatmapData.weeks.map((week, wIdx) => (
-                            <div key={wIdx} className="flex flex-col gap-1.5">
-                              {week.map((dayItem) => {
-                                const { dateKey, count, isFuture, isToday } = dayItem;
-                                return (
-                                  <button
-                                    key={dateKey}
-                                    disabled={isFuture}
-                                    onClick={() => !isFuture && setSelectedDateForDetails(dateKey)}
-                                    className={`w-3.5 h-3.5 rounded-sm transition-all duration-200 relative group ${getCellColor(
-                                      count,
-                                      isFuture,
-                                      isToday
-                                    )}`}
-                                  >
-                                    {!isFuture && (
-                                      <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:flex flex-col items-center z-30">
-                                        <div className="px-2.5 py-1.5 rounded-lg bg-zinc-900 text-white text-[11px] font-medium shadow-xl whitespace-nowrap border border-zinc-700">
-                                          <div className="font-bold text-emerald-400">
-                                            {count === 0 ? 'Нет активности' : `${count} ${count === 1 ? 'задача' : count < 5 ? 'задачи' : 'задач'}`}
+                        {/* Day Columns */}
+                        <div className="flex">
+                          <div className="flex flex-col justify-between text-[10px] font-bold text-zinc-400 pr-2 h-[105px] py-0.5">
+                            <span>Пн</span>
+                            <span>Ср</span>
+                            <span>Пт</span>
+                          </div>
+
+                          <div className="flex gap-1.5">
+                            {heatmapData.weeks.map((week, wIdx) => (
+                              <div key={wIdx} className="flex flex-col gap-1.5">
+                                {week.map((dayItem) => {
+                                  const { dateKey, count, isFuture, isToday } = dayItem;
+                                  return (
+                                    <button
+                                      key={dateKey}
+                                      disabled={isFuture}
+                                      onClick={() => !isFuture && setSelectedDateForDetails(dateKey)}
+                                      className={`w-3.5 h-3.5 rounded-sm transition-all duration-200 relative group active:scale-125 ${getCellColor(
+                                        count,
+                                        isFuture,
+                                        isToday
+                                      )}`}
+                                    >
+                                      {!isFuture && (
+                                        <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:flex flex-col items-center z-30">
+                                          <div className="px-2.5 py-1.5 rounded-lg bg-zinc-900 text-white text-[11px] font-medium shadow-xl whitespace-nowrap border border-zinc-700">
+                                            <div className="font-bold text-emerald-400">
+                                              {count === 0 ? 'Нет активности' : `${count} ${count === 1 ? 'задача' : count < 5 ? 'задачи' : 'задач'}`}
+                                            </div>
+                                            <div className="text-zinc-400 text-[10px]">{formatDateRu(dateKey)}</div>
                                           </div>
-                                          <div className="text-zinc-400 text-[10px]">{formatDateRu(dateKey)}</div>
+                                          <div className="w-2 h-2 -mt-1 rotate-45 bg-zinc-900 border-r border-b border-zinc-700" />
                                         </div>
-                                        <div className="w-2 h-2 -mt-1 rotate-45 bg-zinc-900 border-r border-b border-zinc-700" />
-                                      </div>
-                                    )}
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          ))}
+                                      )}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            ))}
+                          </div>
                         </div>
                       </div>
                     </div>
                   </div>
 
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-2 text-xs text-zinc-500">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 pt-1 text-[11px] sm:text-xs text-zinc-500">
                     <div className="flex items-center gap-1.5">
-                      <Icon name="info" className="w-3.5 h-3.5 text-indigo-400" />
-                      <span>Кликните на любой квадратик, чтобы посмотреть историю дня или добавить активность.</span>
+                      <Icon name="info" className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                      <span>Смахните сетку вправо/влево и кликните на квадратик для деталей.</span>
                     </div>
                     <div className="font-medium text-emerald-500">
-                      Сегодня: {activityLog[toDateKey(new Date())]?.count || 0} задач закрыто
+                      Сегодня: {activityLog[toDateKey(new Date())]?.count || 0} закрыто
                     </div>
                   </div>
                 </div>
 
                 {/* History Log */}
-                <div className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900/80 p-5 shadow-sm space-y-4">
-                  <h3 className="font-bold text-base text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+                <div className="rounded-2xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900/80 p-4 sm:p-5 shadow-sm space-y-3 sm:space-y-4">
+                  <h3 className="font-bold text-sm sm:text-base text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
                     <Icon name="calendar" className="w-4 h-4 text-indigo-400" />
                     Лента недавних достижений
                   </h3>
 
                   {Object.keys(activityLog).length === 0 ? (
-                    <div className="py-8 text-center text-xs text-zinc-400">
+                    <div className="py-6 text-center text-xs text-zinc-400">
                       История активности пуста. Закрывайте домашние задания или вносите дела вручную!
                     </div>
                   ) : (
@@ -1815,26 +2168,26 @@
                         .sort(([a], [b]) => b.localeCompare(a))
                         .slice(0, 5)
                         .map(([dKey, data]) => (
-                          <div key={dKey} className="py-3 flex items-start justify-between gap-4">
-                            <div>
+                          <div key={dKey} className="py-2.5 sm:py-3 flex items-start justify-between gap-3">
+                            <div className="min-w-0">
                               <div className="text-xs font-bold text-indigo-500 dark:text-indigo-400">
                                 {formatDateFullRu(dKey)}
                               </div>
-                              <div className="text-sm font-semibold text-zinc-800 dark:text-zinc-200 mt-0.5">
+                              <div className="text-xs sm:text-sm font-semibold text-zinc-800 dark:text-zinc-200 mt-0.5">
                                 Закрыто: {data.count} {data.count === 1 ? 'действие' : 'действия'}
                               </div>
-                              <div className="flex flex-wrap gap-1.5 mt-1.5">
-                                {data.items.slice(0, 3).map(item => (
+                              <div className="flex flex-wrap gap-1 mt-1.5">
+                                {data.items.slice(0, 2).map(item => (
                                   <span
                                     key={item.id}
-                                    className="px-2 py-0.5 rounded-md bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 text-xs font-medium"
+                                    className="px-2 py-0.5 rounded-md bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 text-[11px] sm:text-xs font-medium truncate max-w-[200px]"
                                   >
                                     ✓ {item.title}
                                   </span>
                                 ))}
-                                {data.items.length > 3 && (
-                                  <span className="text-xs text-zinc-400 self-center">
-                                    +{data.items.length - 3} ещё
+                                {data.items.length > 2 && (
+                                  <span className="text-[11px] text-zinc-400 self-center">
+                                    +{data.items.length - 2} ещё
                                   </span>
                                 )}
                               </div>
@@ -1842,9 +2195,9 @@
 
                             <button
                               onClick={() => setSelectedDateForDetails(dKey)}
-                              className="text-xs font-semibold text-indigo-500 hover:text-indigo-400 shrink-0 self-center"
+                              className="text-xs font-semibold text-indigo-500 hover:text-indigo-400 shrink-0 self-center p-1.5"
                             >
-                              Подробнее →
+                              Инфо →
                             </button>
                           </div>
                         ))}
@@ -1855,21 +2208,72 @@
             )}
           </main>
 
+          {/* NATIVE-LIKE MOBILE BOTTOM NAVIGATION BAR */}
+          <nav className="sm:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-[#0a0c10]/95 backdrop-blur-xl border-t border-zinc-200/80 dark:border-zinc-800/80 px-2 py-1.5 flex items-center justify-around shadow-2xl pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+            <button
+              onClick={() => setActiveTab('tasks')}
+              className={`flex flex-col items-center justify-center gap-1 py-1 px-3 rounded-xl transition-all ${
+                activeTab === 'tasks'
+                  ? 'text-indigo-600 dark:text-indigo-400 font-bold scale-105'
+                  : 'text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300'
+              }`}
+            >
+              <Icon name="checkCircle" className="w-5 h-5" />
+              <span className="text-[10px]">Домашка</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('schedule')}
+              className={`flex flex-col items-center justify-center gap-1 py-1 px-3 rounded-xl transition-all ${
+                activeTab === 'schedule'
+                  ? 'text-indigo-600 dark:text-indigo-400 font-bold scale-105'
+                  : 'text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300'
+              }`}
+            >
+              <Icon name="calendar" className="w-5 h-5" />
+              <span className="text-[10px]">Уроки</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('grades')}
+              className={`flex flex-col items-center justify-center gap-1 py-1 px-3 rounded-xl transition-all ${
+                activeTab === 'grades'
+                  ? 'text-indigo-600 dark:text-indigo-400 font-bold scale-105'
+                  : 'text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300'
+              }`}
+            >
+              <Icon name="award" className="w-5 h-5" />
+              <span className="text-[10px]">Оценки</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('analytics')}
+              className={`flex flex-col items-center justify-center gap-1 py-1 px-3 rounded-xl transition-all ${
+                activeTab === 'analytics'
+                  ? 'text-indigo-600 dark:text-indigo-400 font-bold scale-105'
+                  : 'text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300'
+              }`}
+            >
+              <Icon name="trending" className="w-5 h-5" />
+              <span className="text-[10px]">Активность</span>
+            </button>
+          </nav>
+
           {/* DAY DETAILS & MANUAL ACTIVITY MODAL */}
           {selectedDateForDetails && (
-            <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-              <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+              <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl max-w-md w-full p-4 sm:p-6 shadow-2xl space-y-4 max-h-[92vh] overflow-y-auto">
                 
                 <div className="flex items-start justify-between">
                   <div>
                     <span className="text-xs font-bold text-emerald-500 uppercase tracking-wider">Карточка дня</span>
-                    <h3 className="font-bold text-lg text-zinc-900 dark:text-white capitalize">
+                    <h3 className="font-bold text-base sm:text-lg text-zinc-900 dark:text-white capitalize">
                       {formatDateFullRu(selectedDateForDetails)}
                     </h3>
                   </div>
                   <button
                     onClick={() => setSelectedDateForDetails(null)}
-                    className="text-zinc-400 hover:text-zinc-200 p-1 rounded-lg"
+                    className="text-zinc-400 hover:text-zinc-200 p-2 rounded-lg"
                   >
                     <Icon name="x" className="w-5 h-5" />
                   </button>
@@ -1891,11 +2295,11 @@
                       value={manualActivityTitle}
                       onChange={(e) => setManualActivityTitle(e.target.value)}
                       onKeyDown={(e) => e.key === 'Enter' && handleAddManualActivity(selectedDateForDetails)}
-                      className="flex-1 px-3 py-2 text-xs rounded-xl border border-zinc-300 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                      className="flex-1 px-3 py-2.5 text-xs rounded-xl border border-zinc-300 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                     />
                     <button
                       onClick={() => handleAddManualActivity(selectedDateForDetails)}
-                      className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold shrink-0 transition-all"
+                      className="px-3.5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold shrink-0 transition-all active:scale-95"
                     >
                       +1 Зачесть
                     </button>
@@ -1904,7 +2308,7 @@
 
                 <div className="space-y-2">
                   <span className="text-xs font-bold text-zinc-400">Список дел за этот день:</span>
-                  <div className="max-h-56 overflow-y-auto space-y-1.5 pr-1">
+                  <div className="max-h-48 sm:max-h-56 overflow-y-auto space-y-1.5 pr-1">
                     {(activityLog[selectedDateForDetails]?.items || []).map(item => (
                       <div
                         key={item.id}
@@ -1917,7 +2321,7 @@
                         </div>
                         <button
                           onClick={() => handleDeleteActivityItem(selectedDateForDetails, item.id)}
-                          className="text-zinc-400 hover:text-rose-400 shrink-0 ml-2"
+                          className="text-zinc-400 hover:text-rose-400 shrink-0 ml-2 p-1"
                           title="Удалить запись"
                         >
                           <Icon name="trash" className="w-3.5 h-3.5" />
@@ -1936,7 +2340,7 @@
                 <div className="pt-2 flex justify-end">
                   <button
                     onClick={() => setSelectedDateForDetails(null)}
-                    className="px-4 py-2 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 text-xs font-bold hover:bg-zinc-200 dark:hover:bg-zinc-700"
+                    className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 text-xs font-bold hover:bg-zinc-200 dark:hover:bg-zinc-700 active:scale-95"
                   >
                     Закрыть
                   </button>
@@ -1947,25 +2351,25 @@
 
           {/* ZEN POMODORO FULLSCREEN MODE */}
           {zenOpen && (
-            <div className="fixed inset-0 z-50 bg-[#08090d]/95 backdrop-blur-2xl text-white flex flex-col justify-between p-6 sm:p-12">
+            <div className="fixed inset-0 z-50 bg-[#08090d]/95 backdrop-blur-2xl text-white flex flex-col justify-between p-4 sm:p-12 overflow-y-auto">
               
               <div className="flex items-center justify-between max-w-4xl w-full mx-auto">
-                <div className="flex items-center gap-2 text-indigo-400 font-bold tracking-wider uppercase text-xs">
+                <div className="flex items-center gap-2 text-indigo-400 font-bold tracking-wider uppercase text-[11px] sm:text-xs">
                   <Icon name="headphones" className="w-4 h-4 animate-pulse" />
-                  <span>Дзен-режим глубокой концентрации</span>
+                  <span>Фокусирование</span>
                 </div>
 
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 sm:gap-3">
                   <button
                     onClick={toggleAmbientSound}
-                    className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl border text-xs font-bold transition-all ${
+                    className={`flex items-center gap-1.5 sm:gap-2 px-3 py-1.5 rounded-xl border text-xs font-bold transition-all ${
                       ambientSound
                         ? 'bg-indigo-600/30 border-indigo-500 text-indigo-300 shadow-lg shadow-indigo-500/20'
                         : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-white'
                     }`}
                   >
-                    {ambientSound ? <Icon name="volume" className="w-4 h-4 text-indigo-400" /> : <Icon name="volumeX" className="w-4 h-4" />}
-                    <span>Шум дождя (генератор)</span>
+                    {ambientSound ? <Icon name="volume" className="w-3.5 h-3.5 text-indigo-400" /> : <Icon name="volumeX" className="w-3.5 h-3.5" />}
+                    <span className="hidden sm:inline">Шум дождя</span>
                   </button>
 
                   <button
@@ -1978,7 +2382,7 @@
                 </div>
               </div>
 
-              <div className="flex flex-col items-center justify-center max-w-lg w-full mx-auto text-center space-y-8 my-auto">
+              <div className="flex flex-col items-center justify-center max-w-lg w-full mx-auto text-center space-y-6 sm:space-y-8 my-auto py-8">
                 
                 <div className="space-y-2 w-full">
                   <span className="text-xs text-zinc-500 font-bold uppercase tracking-wider">Фокус на задании:</span>
@@ -1988,7 +2392,7 @@
                       const t = tasks.find(x => x.id === e.target.value);
                       setZenTask(t);
                     }}
-                    className="w-full text-center px-4 py-2.5 rounded-xl bg-zinc-900/80 border border-zinc-800 text-sm font-semibold text-zinc-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="w-full text-center px-3 py-2.5 rounded-xl bg-zinc-900/80 border border-zinc-800 text-xs sm:text-sm font-semibold text-zinc-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   >
                     {tasks.length === 0 ? (
                       <option value="">(Заданий пока нет — свободный фокус)</option>
@@ -2003,7 +2407,7 @@
                 </div>
 
                 <div className="relative">
-                  <div className="text-7xl sm:text-9xl font-black font-mono tracking-tight bg-gradient-to-b from-white via-zinc-200 to-zinc-500 bg-clip-text text-transparent select-none">
+                  <div className="text-6xl sm:text-8xl md:text-9xl font-black font-mono tracking-tight bg-gradient-to-b from-white via-zinc-200 to-zinc-500 bg-clip-text text-transparent select-none">
                     {formatTimer(pomodoroTime)}
                   </div>
                   <div className="text-xs uppercase tracking-widest text-indigo-400 font-bold mt-2">
@@ -2014,9 +2418,9 @@
                 <div className="flex items-center gap-4">
                   <button
                     onClick={() => setIsTimerRunning(!isTimerRunning)}
-                    className="w-16 h-16 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white flex items-center justify-center shadow-lg shadow-indigo-600/30 transition-transform active:scale-95"
+                    className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white flex items-center justify-center shadow-lg shadow-indigo-600/30 transition-transform active:scale-95"
                   >
-                    {isTimerRunning ? <Icon name="pause" className="w-7 h-7" /> : <Icon name="play" className="w-7 h-7 ml-1" />}
+                    {isTimerRunning ? <Icon name="pause" className="w-6 h-6 sm:w-7 sm:h-7" /> : <Icon name="play" className="w-6 h-6 sm:w-7 sm:h-7 ml-1" />}
                   </button>
 
                   <button
@@ -2024,10 +2428,10 @@
                       setIsTimerRunning(false);
                       setPomodoroTime(timerMode === 'work' ? 25 * 60 : 5 * 60);
                     }}
-                    className="w-12 h-12 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-400 hover:text-white flex items-center justify-center transition-all"
+                    className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-400 hover:text-white flex items-center justify-center transition-all active:scale-95"
                     title="Сброс"
                   >
-                    <Icon name="rotate" className="w-5 h-5" />
+                    <Icon name="rotate" className="w-4 h-4 sm:w-5 sm:h-5" />
                   </button>
                 </div>
 
@@ -2037,25 +2441,25 @@
                       handleTaskStatusChange(zenTask.id, 'done');
                       setZenOpen(false);
                     }}
-                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/30 text-xs font-bold transition-all"
+                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/30 text-xs font-bold transition-all active:scale-95"
                   >
                     <Icon name="check" className="w-4 h-4" /> Отметить задание как выполненное
                   </button>
                 )}
               </div>
 
-              <div className="text-center text-xs text-zinc-600">
-                «Регулярность коммитов и небольшие ежедневные шаги приводят к выдающимся результатам.»
+              <div className="text-center text-[11px] sm:text-xs text-zinc-600">
+                «Регулярность и небольшие ежедневные шаги приводят к выдающимся результатам.»
               </div>
             </div>
           )}
 
           {/* TASK MODAL */}
           {isTaskModalOpen && (
-            <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-              <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+              <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl max-w-md w-full p-4 sm:p-6 shadow-2xl space-y-4 max-h-[92vh] overflow-y-auto">
                 <div className="flex items-center justify-between">
-                  <h3 className="font-bold text-lg text-zinc-900 dark:text-white">
+                  <h3 className="font-bold text-base sm:text-lg text-zinc-900 dark:text-white">
                     {editingTask ? 'Редактировать задание' : 'Новое домашнее задание'}
                   </h3>
                   <button
@@ -2063,7 +2467,7 @@
                       setIsTaskModalOpen(false);
                       setEditingTask(null);
                     }}
-                    className="text-zinc-400 hover:text-zinc-200"
+                    className="text-zinc-400 hover:text-zinc-200 p-2"
                   >
                     <Icon name="x" className="w-5 h-5" />
                   </button>
@@ -2093,7 +2497,7 @@
                       required
                       defaultValue={editingTask?.title || ''}
                       placeholder="Например: Решить вариант 4, задачи 1-5"
-                      className="w-full mt-1 px-3 py-2 text-sm rounded-xl border border-zinc-300 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      className="w-full mt-1 px-3 py-2.5 text-xs sm:text-sm rounded-xl border border-zinc-300 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     />
                   </div>
 
@@ -2103,12 +2507,12 @@
                       name="subject"
                       required
                       defaultValue={editingTask?.subject || ''}
-                      placeholder="Например: Математический анализ"
-                      className="w-full mt-1 px-3 py-2 text-sm rounded-xl border border-zinc-300 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      placeholder="Например: Алгебра"
+                      className="w-full mt-1 px-3 py-2.5 text-xs sm:text-sm rounded-xl border border-zinc-300 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
                     <div>
                       <label className="text-xs font-bold text-zinc-400">Дедлайн *</label>
                       <input
@@ -2116,7 +2520,7 @@
                         name="deadline"
                         required
                         defaultValue={editingTask?.deadline || toDateKey(new Date())}
-                        className="w-full mt-1 px-3 py-2 text-sm rounded-xl border border-zinc-300 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        className="w-full mt-1 px-2.5 py-2.5 text-xs sm:text-sm rounded-xl border border-zinc-300 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                       />
                     </div>
 
@@ -2125,7 +2529,7 @@
                       <select
                         name="priority"
                         defaultValue={editingTask?.priority || 'medium'}
-                        className="w-full mt-1 px-3 py-2 text-sm rounded-xl border border-zinc-300 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        className="w-full mt-1 px-2.5 py-2.5 text-xs sm:text-sm rounded-xl border border-zinc-300 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                       >
                         <option value="high">🔥 Высокий</option>
                         <option value="medium">⚡ Средний</option>
@@ -2134,20 +2538,21 @@
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
                     <div>
                       <label className="text-xs font-bold text-zinc-400">Формат сдачи</label>
                       <select
                         name="format"
                         defaultValue={editingTask?.format || '#тетрадь'}
-                        className="w-full mt-1 px-3 py-2 text-sm rounded-xl border border-zinc-300 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        className="w-full mt-1 px-2.5 py-2.5 text-xs sm:text-sm rounded-xl border border-zinc-300 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                       >
                         <option value="#тетрадь">#тетрадь</option>
-                        <option value="#лаба">#лаба</option>
+                        <option value="#лабараторная">#лабараторная</option>
                         <option value="#презентация">#презентация</option>
                         <option value="#тест">#тест</option>
                         <option value="#эссе">#эссе</option>
                         <option value="#электронно">#электронно</option>
+                         <option value="#без-формата">#без-формата</option>
                       </select>
                     </div>
 
@@ -2157,7 +2562,7 @@
                         name="estTime"
                         defaultValue={editingTask?.estTime || '~45 мин'}
                         placeholder="~30 мин, 1.5 ч"
-                        className="w-full mt-1 px-3 py-2 text-sm rounded-xl border border-zinc-300 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        className="w-full mt-1 px-3 py-2.5 text-xs sm:text-sm rounded-xl border border-zinc-300 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                       />
                     </div>
                   </div>
@@ -2169,7 +2574,7 @@
                       rows={2}
                       defaultValue={editingTask?.notes || ''}
                       placeholder="Дополнительные комментарии..."
-                      className="w-full mt-1 px-3 py-2 text-sm rounded-xl border border-zinc-300 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      className="w-full mt-1 px-3 py-2 text-xs sm:text-sm rounded-xl border border-zinc-300 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     />
                   </div>
 
@@ -2180,13 +2585,13 @@
                         setIsTaskModalOpen(false);
                         setEditingTask(null);
                       }}
-                      className="px-4 py-2 rounded-xl text-sm font-semibold text-zinc-400 hover:text-zinc-200"
+                      className="px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold text-zinc-400 hover:text-zinc-200"
                     >
                       Отмена
                     </button>
                     <button
                       type="submit"
-                      className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-bold shadow-md shadow-indigo-600/30"
+                      className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs sm:text-sm font-bold shadow-md shadow-indigo-600/30 active:scale-95"
                     >
                       {editingTask ? 'Сохранить' : 'Добавить'}
                     </button>
@@ -2198,13 +2603,13 @@
 
           {/* SCHEDULE CLASS MODAL */}
           {isClassModalOpen && (
-            <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-              <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+              <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl max-w-md w-full p-4 sm:p-6 shadow-2xl space-y-4 max-h-[92vh] overflow-y-auto">
                 <div className="flex items-center justify-between">
-                  <h3 className="font-bold text-lg text-zinc-900 dark:text-white">
+                  <h3 className="font-bold text-base sm:text-lg text-zinc-900 dark:text-white">
                     Новый урок ({selectedDay})
                   </h3>
-                  <button onClick={() => setIsClassModalOpen(false)} className="text-zinc-400 hover:text-zinc-200">
+                  <button onClick={() => setIsClassModalOpen(false)} className="text-zinc-400 hover:text-zinc-200 p-2">
                     <Icon name="x" className="w-5 h-5" />
                   </button>
                 </div>
@@ -2220,7 +2625,7 @@
                       textbookDuty: selectedTextbookDuty
                     });
                   }}
-                  className="space-y-4"
+                  className="space-y-3.5"
                 >
                   <div>
                     <label className="text-xs font-bold text-zinc-400">Название предмета / урока *</label>
@@ -2228,7 +2633,7 @@
                       name="name"
                       required
                       placeholder="Например: Алгебра, Русский язык, Физика"
-                      className="w-full mt-1.5 px-3 py-2 text-sm rounded-xl border border-zinc-300 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      className="w-full mt-1 px-3 py-2.5 text-xs sm:text-sm rounded-xl border border-zinc-300 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     />
                   </div>
 
@@ -2239,7 +2644,7 @@
                       required
                       defaultValue="08:30 - 09:15"
                       placeholder="08:30 - 09:15"
-                      className="w-full mt-1.5 px-3 py-2 text-sm rounded-xl border border-zinc-300 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      className="w-full mt-1 px-3 py-2.5 text-xs sm:text-sm rounded-xl border border-zinc-300 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     />
                   </div>
 
@@ -2248,7 +2653,7 @@
                     <select
                       name="breakType"
                       defaultValue="auto"
-                      className="w-full mt-1.5 px-3 py-2 text-sm rounded-xl border border-zinc-300 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      className="w-full mt-1 px-3 py-2.5 text-xs sm:text-sm rounded-xl border border-zinc-300 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     >
                       <option value="auto">⚡ Автоматически по времени уроков</option>
                       <option value="Маленькая перемена: 10 мин">Маленькая перемена: 10 мин</option>
@@ -2266,30 +2671,30 @@
                         Выбрано: <span className="font-bold underline">{selectedTextbookDuty}</span>
                       </span>
                     </div>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-1.5">
+                    <div className="grid grid-cols-2 gap-2 mt-1">
                       {[
                         {
                           id: 'Рома',
                           label: 'Рома',
-                          activeClass: 'border-sky-500 bg-sky-500/20 text-sky-600 dark:text-sky-300 ring-2 ring-sky-500/40 shadow-md shadow-sky-500/20 scale-[1.03]',
+                          activeClass: 'border-sky-500 bg-sky-500/20 text-sky-600 dark:text-sky-300 ring-2 ring-sky-500/40 shadow-md shadow-sky-500/20 scale-[1.02]',
                           dotClass: 'bg-sky-400'
                         },
                         {
                           id: 'Ермолай',
                           label: 'Ермолай',
-                          activeClass: 'border-amber-500 bg-amber-500/20 text-amber-600 dark:text-amber-300 ring-2 ring-amber-500/40 shadow-md shadow-amber-500/20 scale-[1.03]',
+                          activeClass: 'border-amber-500 bg-amber-500/20 text-amber-600 dark:text-amber-300 ring-2 ring-amber-500/40 shadow-md shadow-amber-500/20 scale-[1.02]',
                           dotClass: 'bg-amber-400'
                         },
                         {
                           id: 'Оба',
                           label: 'Оба',
-                          activeClass: 'border-violet-500 bg-violet-500/20 text-violet-600 dark:text-violet-300 ring-2 ring-violet-500/40 shadow-md shadow-violet-500/20 scale-[1.03]',
+                          activeClass: 'border-violet-500 bg-violet-500/20 text-violet-600 dark:text-violet-300 ring-2 ring-violet-500/40 shadow-md shadow-violet-500/20 scale-[1.02]',
                           dotClass: 'bg-violet-400'
                         },
                         {
                           id: 'Без учебника',
                           label: 'Без учебника',
-                          activeClass: 'border-zinc-500 dark:border-zinc-400 bg-zinc-200 dark:bg-zinc-700/80 text-zinc-900 dark:text-zinc-100 ring-2 ring-zinc-500/40 shadow-md scale-[1.03]',
+                          activeClass: 'border-zinc-500 dark:border-zinc-400 bg-zinc-200 dark:bg-zinc-700/80 text-zinc-900 dark:text-zinc-100 ring-2 ring-zinc-500/40 shadow-md scale-[1.02]',
                           dotClass: 'bg-zinc-400'
                         }
                       ].map((item) => {
@@ -2299,10 +2704,10 @@
                             key={item.id}
                             type="button"
                             onClick={() => setSelectedTextbookDuty(item.id)}
-                            className={`flex flex-col items-center justify-center gap-1.5 p-3 rounded-xl border font-bold text-xs transition-all duration-200 cursor-pointer select-none text-center ${
+                            className={`flex flex-col items-center justify-center gap-1 p-2.5 rounded-xl border font-bold text-xs transition-all duration-200 cursor-pointer select-none text-center ${
                               isSelected
                                 ? item.activeClass
-                                : 'border-zinc-200 dark:border-zinc-700/70 bg-zinc-50 dark:bg-zinc-800/60 text-zinc-600 dark:text-zinc-400 hover:border-zinc-400 dark:hover:border-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 opacity-80 hover:opacity-100'
+                                : 'border-zinc-200 dark:border-zinc-700/70 bg-zinc-50 dark:bg-zinc-800/60 text-zinc-600 dark:text-zinc-400 hover:border-zinc-400 hover:bg-zinc-100 opacity-80 hover:opacity-100'
                             }`}
                           >
                             <span className="flex items-center gap-1.5">
@@ -2313,11 +2718,6 @@
                               )}
                               <span>{item.label}</span>
                             </span>
-                            {isSelected && (
-                              <span className="text-[10px] font-semibold opacity-90 leading-none">
-                                ✓ выбрано
-                              </span>
-                            )}
                           </button>
                         );
                       })}
@@ -2328,13 +2728,13 @@
                     <button
                       type="button"
                       onClick={() => setIsClassModalOpen(false)}
-                      className="px-4 py-2 rounded-xl text-sm font-semibold text-zinc-400 hover:text-zinc-200"
+                      className="px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold text-zinc-400 hover:text-zinc-200"
                     >
                       Отмена
                     </button>
                     <button
                       type="submit"
-                      className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-bold shadow-md shadow-indigo-600/30"
+                      className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs sm:text-sm font-bold shadow-md shadow-indigo-600/30 active:scale-95"
                     >
                       Добавить урок
                     </button>
@@ -2346,13 +2746,13 @@
 
           {/* SUBJECT MODAL */}
           {isSubjectModalOpen && (
-            <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-              <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+              <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl max-w-md w-full p-4 sm:p-6 shadow-2xl space-y-4 max-h-[92vh] overflow-y-auto">
                 <div className="flex items-center justify-between">
-                  <h3 className="font-bold text-lg text-zinc-900 dark:text-white">
+                  <h3 className="font-bold text-base sm:text-lg text-zinc-900 dark:text-white">
                     Новый учебный предмет
                   </h3>
-                  <button onClick={() => setIsSubjectModalOpen(false)} className="text-zinc-400 hover:text-zinc-200">
+                  <button onClick={() => setIsSubjectModalOpen(false)} className="text-zinc-400 hover:text-zinc-200 p-2">
                     <Icon name="x" className="w-5 h-5" />
                   </button>
                 </div>
@@ -2373,8 +2773,8 @@
                     <input
                       name="name"
                       required
-                      placeholder="Например: Математический анализ, Английский"
-                      className="w-full mt-1 px-3 py-2 text-sm rounded-xl border border-zinc-300 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      placeholder="Например: Алгебра, Английский"
+                      className="w-full mt-1 px-3 py-2.5 text-xs sm:text-sm rounded-xl border border-zinc-300 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     />
                   </div>
 
@@ -2387,7 +2787,7 @@
                       min="2.0"
                       max="5.0"
                       defaultValue="4.75"
-                      className="w-full mt-1 px-3 py-2 text-sm rounded-xl border border-zinc-300 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      className="w-full mt-1 px-3 py-2.5 text-xs sm:text-sm rounded-xl border border-zinc-300 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     />
                   </div>
 
@@ -2395,13 +2795,13 @@
                     <button
                       type="button"
                       onClick={() => setIsSubjectModalOpen(false)}
-                      className="px-4 py-2 rounded-xl text-sm font-semibold text-zinc-400 hover:text-zinc-200"
+                      className="px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold text-zinc-400 hover:text-zinc-200"
                     >
                       Отмена
                     </button>
                     <button
                       type="submit"
-                      className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-bold shadow-md shadow-indigo-600/30"
+                      className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs sm:text-sm font-bold shadow-md shadow-indigo-600/30 active:scale-95"
                     >
                       Добавить
                     </button>
